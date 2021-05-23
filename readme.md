@@ -51,3 +51,4 @@ You can message the bot as if you were messaging the other person directly. The 
 I hope that you will continue to deliver heartfelt handwritten notes while sharing photos of your gifts/pranks in this group, and at the same time enhance your experience by using the bot to message your partner as needed, whether it is to let them know to collect your response, or to have a back and forth conversation.
 
 If you registered with the wrong ID (it should be your own name, not your mortal's), use /deregister to deregister
+change
