@@ -39,6 +39,7 @@ RequireRegister = async (ctx, next) => {
         ctx.person = person
         ctx.angel = model.getPersonByUuid(person.angel)
         ctx.mortal = model.getPersonByUuid(person.mortal)
+        ctx.name = person.username
         await next();
     } else {
         let success = false;

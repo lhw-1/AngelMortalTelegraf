@@ -2,12 +2,15 @@ const fs = require('fs')
 const storage = require("node-persist");
 const {Person, Model} = require("./model");
 
+console.log("ffs")
+
 InputHandler = (model) => async (input) => {
     const tokens = input.trim().split(" ")
     if (tokens.length === 0)
         return;
     const command = tokens[0].toLowerCase()
     const args = tokens.slice(1)
+    console.log(command)
     switch (command) {
         // TODO: add command to save ID pairings to file
 
@@ -20,7 +23,7 @@ InputHandler = (model) => async (input) => {
         //     breduak;
         case "loadpaired":
             await LoadCommand(args[0], true, model);
-            // console.log(model.dumpUuids())
+            console.log(model.dumpUuids())
             model.saveToStorage()
             break;
         case "list":

@@ -29,10 +29,10 @@ RegisterSuccessHandler = async (ctx) => {
 
     await ctx.reply(messages.RegisterSuccess(person.name, ctx.chatTarget))
 
-    await ctx.reply(messages.ReferToBot(ctx.chatAs))
-    if (!ctx.isAngel) {
-        await ctx.reply(messages.StatusHint)
-    }
+    //await ctx.reply(messages.ReferToBot(ctx.chatAs))
+    //if (!ctx.isAngel) {
+    //    await ctx.reply(messages.StatusHint)
+    //}
 
     if (angel.isRegistered()) {
         await ctx.model.mortalBot.telegram.sendMessage(angel.telegramId, messages.RegisteredNotifier('mortal'))
@@ -74,6 +74,7 @@ DeregisterHandler = async (ctx) => {
 
 MessageHandler = async (ctx) => {
     const target = ctx.isAngel ? ctx.angel : ctx.mortal
+    console.log(ctx.person.name + ": " + ctx.message.text)
     if (target.isRegistered()) {
         await ctx.otherBot.telegram.sendMessage(target.telegramId, ctx.message.text)
     } else {
@@ -157,10 +158,6 @@ StartHandler = async (ctx) => {
     await ctx.reply(message)
     if (!ctx.isRegistered) {
         await ctx.reply(messages.RegisterReminder)
-    } else {
-        if (ctx.isMortal) {
-            await ctx.reply(messages.StatusHint)
-        }
     }
 }
 
