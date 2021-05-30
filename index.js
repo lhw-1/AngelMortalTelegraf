@@ -12,11 +12,12 @@ function setupCLI() {
 
 async function main() {
     const model = await Model.loadFromStorage()
+    cli.InputHandler(model)("loadpaired pairings.txt");
     model.saveToStorage()
-    server.start(model);
+    server.start(model); 
     readline.on('line', cli.InputHandler(model));
 
-    console.log(model.dumpUuids())
+    // console.log(model.dumpUuids())
 }
 
 main()
