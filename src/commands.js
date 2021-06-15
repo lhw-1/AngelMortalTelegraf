@@ -4,8 +4,21 @@ RegisterFailedHandler = async (ctx, uuid) => {
     ctx.reply(messages.RegisterFailedGeneralError(uuid))
 }
 
+MatchHandler = async (ctx) => {
+    const re = /\/m(?:atch)? (\w+)/g
+    const parsed = re.exec(ctx.message.text)
+    if(!parsed) {
+        return ctx.reply("pls enter valid code")
+    }
+    const match_id = parsed[1]
+    await ctx.model.match(ctx.from.id, match_id)
+    await ctx.reply("matched")
+}
+
 RegisterHandler = async (ctx) => {
     //If this telegram user has already registerd to a UUID
+    console.log("here 0")
+    console.log(ctx.person)
     if (ctx.person) {
         return ctx.reply(messages.AlreadyRegisteredError(ctx.person.name))
     }
@@ -15,49 +28,46 @@ RegisterHandler = async (ctx) => {
     if (!parsed) {
         return ctx.reply(messages.RegisterReminder)
     }
-    const uuid = parsed[1]
-    const success = await TryRegister(ctx, uuid)
+    const id = parsed[1]
+    const success = await TryRegister(ctx, id)
+    console.log("success");
+    console.log(success);
     if (!success) {
-        await RegisterFailedHandler(ctx, uuid);
+        await RegisterFailedHandler(ctx, id);
     }
 }
 
 RegisterSuccessHandler = async (ctx) => {
-    const person = ctx.person
-    const angel = ctx.model.getPersonByUuid(person.angel)
-    const mortal = ctx.model.getPersonByUuid(person.mortal)
+    // const person = ctx.person
+    //const match = ctx.model.getPersonByUuid(person.match)
 
-    await ctx.reply(messages.RegisterSuccess(person.name, ctx.chatTarget))
+    // await ctx.reply(messages.RegisterSuccess(person.name, ctx.chatTarget))
+    await ctx.reply("success");
 
     //await ctx.reply(messages.ReferToBot(ctx.chatAs))
     //if (!ctx.isAngel) {
     //    await ctx.reply(messages.StatusHint)
     //}
 
-    if (angel.isRegistered()) {
-        await ctx.model.mortalBot.telegram.sendMessage(angel.telegramId, messages.RegisteredNotifier('mortal'))
-    }
-
-    if (mortal.isRegistered()) {
-        await ctx.model.angelBot.telegram.sendMessage(mortal.telegramId, messages.RegisteredNotifier('angel'))
-    }
+    // if (match.isRegistered()) {
+    //     await ctx.model.angelBot.telegram.sendMessage(mortal.telegramId, messages.RegisteredNotifier('angel'))
+    // }
 }
 
-TryRegister = async (ctx, uuid) => {
+TryRegister = async (ctx, id) => {
     const model = ctx.model;
-    const person = model.getPersonByUuid(uuid)
-
-    // Failed registration if person with given uuid doesn't exist, or if already registered
-    if (!person || person.isRegistered()) {
-        return false
+    const uuid = await model.getUUIDById(id);
+    console.log(uuid)
+    const person = await model.getPersonByUUID(uuid.uid)
+    console.log(person)
+    if (!person) {
+        return false;
     }
-
-    person.register(ctx.from.id)
+    model.register(person, ctx.from.id)
     ctx.person = person
-    model.saveToStorage()
 
     await RegisterSuccessHandler(ctx)
-    return true
+    return true;
 }
 
 DeregisterHandler = async (ctx) => {
@@ -73,10 +83,14 @@ DeregisterHandler = async (ctx) => {
 }
 
 MessageHandler = async (ctx) => {
-    const target = ctx.isAngel ? ctx.angel : ctx.mortal
-    console.log(ctx.person.name + ": " + ctx.message.text)
-    if (target.isRegistered()) {
-        await ctx.otherBot.telegram.sendMessage(target.telegramId, ctx.message.text)
+    // const target = ;
+    // ctx.isAngel ? ctx.angel : ctx.mortal
+    // console.log(ctx.person.name + ": " + ctx.message.text)
+    const senderUUID = (await ctx.model.getUUIDByTeleId(ctx.from.id)).uid
+    const targetUUID = (await ctx.model.getPersonByUUID(senderUUID)).matchUUID
+    const target = await ctx.model.getPersonByUUID(targetUUID)
+    if ("teleId" in target) {
+        await ctx.model.bot.telegram.sendMessage(target.teleId, ctx.message.text)
     } else {
         await ctx.reply(messages.UnregisteredTarget(ctx.chatTarget))
     }
@@ -85,7 +99,7 @@ MessageHandler = async (ctx) => {
 StickerHandler = async (ctx) => {
     const target = ctx.isAngel ? ctx.angel : ctx.mortal
     if (target.isRegistered()) {
-        await ctx.otherBot.telegram.sendSticker(target.telegramId, ctx.message.sticker.file_id)
+        await ctx.model.bot.telegram.sendSticker(target.telegramId, ctx.message.sticker.file_id)
     } else {
         await ctx.reply(messages.UnregisteredTarget(ctx.chatTarget))
     }
@@ -97,9 +111,10 @@ PhotoHandler = async (ctx) => {
     const target = ctx.isAngel ? ctx.angel : ctx.mortal
     if (target.isRegistered()) {
         const fileLink = await ctx.telegram.getFileLink(photos[0].file_id)
-        await ctx.otherBot.telegram.sendPhoto(target.telegramId, {url: fileLink}, {caption})
+        await ctx.model.bot.telegram.sendPhoto(target.telegramId, {url: fileLink}, {caption})
     } else {
-        await ctx.reply(messages.UnregisteredTarget(ctx.chatTarget))
+        await ctx.reply("match hasn't registered")
+            //messages.UnregisteredTarget(ctx.chatTarget))
     }
 }
 
@@ -109,9 +124,10 @@ VideoHandler = async (ctx) => {
     const target = ctx.isAngel ? ctx.angel : ctx.mortal
     if (target.isRegistered()) {
         const fileLink = await ctx.telegram.getFileLink(video.file_id)
-        await ctx.otherBot.telegram.sendVideo(target.telegramId, {url: fileLink}, {caption})
+        await ctx.model.bot.telegram.sendVideo(target.telegramId, {url: fileLink}, {caption})
     } else {
-        await ctx.reply(messages.UnregisteredTarget(ctx.chatTarget))
+        await ctx.reply("match hasn't registered")
+            //messages.UnregisteredTarget(ctx.chatTarget))
     }
 }
 
@@ -120,9 +136,10 @@ VoiceHandler = async (ctx) => {
     const target = ctx.isAngel ? ctx.angel : ctx.mortal
     if (target.isRegistered()) {
         const fileLink = await ctx.telegram.getFileLink(voice.file_id)
-        await ctx.otherBot.telegram.sendVoice(target.telegramId, {url: fileLink})
+        await ctx.model.bot.telegram.sendVoice(target.telegramId, {url: fileLink})
     } else {
-        await ctx.reply(messages.UnregisteredTarget(ctx.chatTarget))
+        await ctx.reply("match hasn't registered")
+            //messages.UnregisteredTarget(ctx.chatTarget))
     }
 }
 
@@ -131,9 +148,10 @@ VideoNoteHandler = async (ctx) => {
     const target = ctx.isAngel ? ctx.angel : ctx.mortal
     if (target.isRegistered()) {
         const fileLink = await ctx.telegram.getFileLink(video.file_id)
-        await ctx.otherBot.telegram.sendVideoNote(target.telegramId, {url: fileLink})
+        await ctx.model.bot.telegram.sendVideoNote(target.telegramId, {url: fileLink})
     } else {
-        await ctx.reply(messages.UnregisteredTarget(ctx.chatTarget))
+        await ctx.reply("match hasn't registered")
+            //messages.UnregisteredTarget(ctx.chatTarget))
     }
 }
 
@@ -165,6 +183,7 @@ module.exports = {
     RegisterHandler,
     DeregisterHandler,
     TryRegister,
+    MatchHandler,
     RegisterSuccessHandler,
     RegisterFailedHandler,
     StatusHandler,

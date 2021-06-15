@@ -2,8 +2,6 @@ const fs = require('fs')
 const storage = require("node-persist");
 const {Person, Model} = require("./model");
 
-console.log("ffs")
-
 InputHandler = (model) => async (input) => {
     const tokens = input.trim().split(" ")
     if (tokens.length === 0)

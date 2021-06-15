@@ -1,37 +1,13 @@
-const storage = require('node-persist');
-storage.init({
-    'dir': 'data',
-    stringify: s => Buffer.from(JSON.stringify(s)).toString('base64'),
-    parse: s => JSON.parse(Buffer.from(s, 'base64').toString('utf8')),
-    encoding: 'utf8',
-    // logging: true,
-    ttl: false,
-});
+const {Firebase} = require("./firebase");
 
 class Model {
     constructor(store) {
-        this.store = store || storage.defaultInstance
-        this.people = [];
-    }
-
-    addPerson(person) {
-        person.uuid = this.generateNewUuid();
-        this.people.push(person);
+        this.fb = new Firebase();
     }
 
     getPersonByName(name) {
         const _name = name.toLowerCase()
         const filtered = this.people.filter(person => person.name.toLowerCase() === _name)
-        return filtered.length > 0 ? filtered[0] : null
-    }
-
-    getPersonByUuid(uuid) {
-        const filtered = this.people.filter(person => person.uuid === uuid)
-        return filtered.length > 0 ? filtered[0] : null
-    }
-
-    getPersonById(telegramId) {
-        const filtered = this.people.filter(person => person.telegramId === telegramId)
         return filtered.length > 0 ? filtered[0] : null
     }
 
@@ -47,38 +23,6 @@ class Model {
         return this.people.map(person => person.toJson())
     }
 
-    static async loadFromStorage() {
-        const data = await storage.defaultInstance.get('data')
-        const model = new Model()
-        try {
-            model.people = data.map(item => Person.fromJson(item))
-        } catch (e) {
-            console.log(`couldn't load data from storage, creating fresh data`)
-        }
-        return model
-    }
-
-    saveToStorage() {
-        this.store.setItem('data', this.toJson())
-    }
-
-    generateNewUuid() {
-        const existingIDs = this.people.map(p => p.uuid);
-        let newID;
-        do {
-            newID = Math.floor(Math.random() * 900000000 + 100000000).toString();
-        } while (existingIDs.includes(newID))
-        return newID;
-    }
-
-    setupAMRefs() {
-        for (let i = 0; i < this.people.length; i++) {
-            const j = (i + 1) % this.people.length
-            this.people[i].mortal = this.people[j].uuid
-            this.people[j].angel = this.people[i].uuid
-        }
-    }
-
     dumpUuids() {
         return this.people.map(person => `${person.name},${person.uuid}`).join("\n")
     }
@@ -90,6 +34,94 @@ class Model {
             }
         }
         return false;
+    }
+
+    setupListener(fn) {
+        this.fb.users().on('value', (snapshot) => {
+            const data = snapshot.val();
+            console.log("Database update triggered:");
+            console.log(data);
+            fn(data);
+            // updateStarCount(postElement, data);
+        });
+        return this;
+    }
+
+    register(person, teleId) {
+        this.fb.userTeleId(teleId).set({
+            id: person.id,
+            uid: person.uid,
+        });
+        this.fb.userUUID(person.uid).update({
+            teleId
+        })
+    }
+
+    async match(teleId, matchCode) {
+        const uuid_one = (await this.getUUIDByTeleId(teleId)).uid;
+        const uuid_two = (await this.getUUIDById(matchCode)).uid;
+        console.log(uuid_one);
+        console.log(uuid_two)
+        this.fb.userUUID(uuid_one).update({
+            matchUUID: uuid_two,
+        });
+        this.fb.userUUID(uuid_two).update({
+            matchUUID: uuid_one,
+        })
+    }
+
+    async getUUIDByTeleId(teleId) {
+        return this.fb.userTeleId(teleId).once('value').then((snapshot) => {
+            if (snapshot.exists()) {
+                return snapshot.val();
+            } else {
+                console.log("No data available");
+            }
+        }).catch((error) => {
+            console.error(error);
+        });
+    }
+
+    async getPersonByUUID(uuid) {
+        return this.fb.userUUID(uuid).once('value').then((snapshot) => {
+            if (snapshot.exists()) {
+                return snapshot.val();
+            } else {
+                console.log("No data available");
+            }
+        }).catch((error) => {
+            console.error(error);
+        });
+    }
+
+    async getUUIDById(id) {
+        return this.fb.userID(id).once('value').then((snapshot) => {
+            if (snapshot.exists()) {
+                return snapshot.val();
+            } else {
+                console.log("No data available");
+            }
+        }).catch((error) => {
+            console.error(error);
+        });
+    }
+
+    getPersonByHandle(handle) {
+        return this.fb.userHandle(handle).once('value').then((snapshot) => {
+            if (snapshot.exists()) {
+                return snapshot.val();
+            } else {
+                console.log("No data available");
+            }
+        }).catch((error) => {
+            console.error(error);
+        });
+    }
+
+    static createModel() {
+        const model = new Model();
+        model.setupListener(a => a);
+        return model;
     }
 
     // copyPeopleFrom(other) {
@@ -109,20 +141,13 @@ class Person {
         this.uuid = ""
         this.name = ""
         this.username = ""
-        this.og = ""
         this.telegramId = ""
-        this.angel = null;
-        this.mortal = null;
+        this.match = null;
         return this;
     }
 
     withName(name) {
         this.name = name;
-        return this;
-    }
-
-    withOg(og) {
-        this.og = og;
         return this;
     }
 
@@ -143,10 +168,8 @@ class Person {
             uuid: this.uuid,
             name: this.name,
             username: this.username,
-            og: this.og,
             telegramId: this.telegramId,
-            angel: this.angel || null,
-            mortal: this.mortal || null,
+            match: this.match || null,
         }
     }
 
@@ -155,10 +178,8 @@ class Person {
         person.uuid = obj.uuid
         person.name = obj.name
         person.username = obj.username
-        person.og = obj.og
         person.telegramId = obj.telegramId
-        person.angel = obj.angel
-        person.mortal = obj.mortal
+        person.match = obj.match
 
         return person
     }

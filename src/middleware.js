@@ -23,7 +23,9 @@ WithModel = (model) => async (ctx, next) => {
 UserId = async (ctx, next) => {
     const telegramId = ctx.from.id;
     const model = ctx.model;
-    const person = model.getPersonById(telegramId)
+    const person = model.getPersonByHandle(telegramId)
+    console.log("userId")
+    console.log(person)
     if (person !== null) {
         ctx.person = person
         ctx.isRegistered = true
@@ -37,8 +39,7 @@ RequireRegister = async (ctx, next) => {
     const person = model.getPersonById(telegramId)
     if (person !== null) {
         ctx.person = person
-        ctx.angel = model.getPersonByUuid(person.angel)
-        ctx.mortal = model.getPersonByUuid(person.mortal)
+        ctx.angel = model.getPersonByUuid(person.match)
         ctx.name = person.username
         await next();
     } else {
@@ -75,14 +76,9 @@ ErrorHandler = async (ctx, next) => {
     }
 }
 
-Settings = (isAngel=true, otherBot) => async(ctx, next) => {
-    ctx.isAngel = isAngel
-    ctx.isMortal = !isAngel
-    ctx.otherBot = otherBot
-    ctx.chatTarget = isAngel ? "Angel" : "Mortal"
-    ctx.chatAs = isAngel ? "Mortal" : "Angel"
-
+Settings = (bot) => async(ctx, next) => {
+    ctx.bot = bot
     await next()
 }
 
-module.exports = {UserId, OnlyPrivate, ErrorHandler, RequireRegister, WithModel, Settings, CodeFilter}
+module.exports = {UserId, OnlyPrivate, ErrorHandler, WithModel, Settings, CodeFilter}
