@@ -31,7 +31,10 @@ class Firebase {
   users = () => this.db.ref('users');
   userID = id => this.db.ref(`ids/${id}`);
   userUUID = uid => this.db.ref(`users/${uid}`);
+  userFriends = uid => this.db.ref(`users/${uid}/friends`);
+  userChat = (uid, chatName) => this.db.ref(`users/${uid}/chats/${chatName}`);
   teleIds = () => this.db.ref('teleIds');
+  matchQueue = () => this.db.ref('matchQueue');
   userTeleId = teleId => this.db.ref(`teleIds/${teleId}`);
 }
 

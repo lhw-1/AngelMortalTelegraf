@@ -76,8 +76,13 @@ ErrorHandler = async (ctx, next) => {
     }
 }
 
-Settings = (bot) => async(ctx, next) => {
-    ctx.bot = bot
+Settings = (bots) => async(ctx, next) => {
+    ctx.bot = bots.bot
+    ctx.bot1 = bots.bot1
+    ctx.bot2 = bots.bot2
+    ctx.bot3 = bots.bot3
+    ctx.bot4 = bots.bot4
+    ctx.bot5 = bots.bot5
     await next()
 }
 
