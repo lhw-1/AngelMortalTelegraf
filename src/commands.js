@@ -195,26 +195,21 @@ EndHandler = async (ctx) => {
   const otherChat = 'chat' + senderPerson.chats[senderChat].matchBOT;
   const otherUid = senderPerson.chats[senderChat].activematchUUID;
   const otherPerson = ctx.model.getPersonByUUID(otherUid);
-  const otherStatus = otherPerson.chats[otherChat].status;
 
-  if (otherStatus === 'end' || otherStatus === 'friend') {
-    ctx.model.fb.userChat(senderUid, senderChat).update({
-      active: false,
-      activematchUUID: '',
-      matchBOT: 0,
-      status: 'vacant',
-    });
-    ctx.model.fb.userChat(otherUid, otherChat).update({
-      active: false,
-      activematchUUID: '',
-      matchBOT: 0,
-      status: 'vacant',
-    });
-  } else {
-    ctx.model.fb.userChat(senderUid, senderChat).update({
-      status: 'end',
-    });
-  }
+  ctx.model.fb.userChat(senderUid, senderChat).update({
+    active: false,
+    activematchUUID: '',
+    matchBOT: 0,
+    status: 'vacant',
+  });
+  ctx.model.fb.userChat(otherUid, otherChat).update({
+    active: false,
+    activematchUUID: '',
+    matchBOT: 0,
+    status: 'vacant',
+  });
+  ctx.model.bots[senderChat].telegram.sendMessage(senderPerson.teleId, 'Moot: Your conversation has ended');
+  ctx.model.bots[otherChat].telegram.sendMessage(otherPerson.teleId, 'Moot: Your conversation has ended');
 }
 
 EndAndFriendHandler = async (ctx) => {
@@ -227,6 +222,8 @@ EndAndFriendHandler = async (ctx) => {
   const otherUid = senderPerson.chats[senderChat].activematchUUID;
   const otherPerson = ctx.model.getPersonByUUID(otherUid);
   const otherStatus = otherPerson.chats[otherChat].status;
+
+  var replyMessage = 'Moot: Your conversation has ended.';
 
   if (otherStatus === 'end' || otherStatus === 'friend') {
     ctx.model.fb.userChat(senderUid, senderChat).update({
@@ -244,7 +241,10 @@ EndAndFriendHandler = async (ctx) => {
     if (otherStatus === 'friend') {
       ctx.model.fb.userFriends(senderUid).push({ friendUid: otherUid, teleUser: otherPerson.teleUser , username: otherPerson.username });
       ctx.model.fb.userFriends(otherUid).push({ friendUid: senderUid, teleUser: senderPerson.teleUser , username: senderPerson.username });
+      replyMessage += ' You\'ve made a new friend on moot - check out your new friend on the moot website!';
     }
+    ctx.model.bots[senderChat].telegram.sendMessage(senderPerson.teleId, replyMessage);
+    ctx.model.bots[otherChat].telegram.sendMessage(otherPerson.teleId, replyMessage);
   } else {
     ctx.model.fb.userChat(senderUid, senderChat).update({
       status: 'friend',

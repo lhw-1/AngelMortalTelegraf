@@ -187,7 +187,7 @@ class Model {
             prevAllActive = false;
             if (newC.active) {
               model.bots['main'].telegram.sendMessage(user.teleId, `You have a new match on @moot_chat${i}_bot. Go say hi!`);
-              model.bots[`chat${i}`].telegram.sendMessage(user.teleId, 'You\'ve been matched with a new user!');
+              model.bots[`chat${i}`].telegram.sendMessage(user.teleId, 'Moot: You\'ve been matched with a new user! Use the /end command to end the conversation immediately or /friend to add them as a friend. If you both add friend, we\'ll add them as your friend on moot!');
             }
           }
         }
