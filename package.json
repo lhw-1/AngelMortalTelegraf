@@ -1,5 +1,5 @@
 {
-  "name": "AngelMortalTelegraf",
+  "name": "moot-telegram",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
@@ -11,6 +11,7 @@
   "license": "ISC",
   "dependencies": {
     "dotenv": "^8.2.0",
+    "firebase": "^8.6.7",
     "node-persist": "^3.1.0",
     "telegraf": "^3.38.0"
   }
