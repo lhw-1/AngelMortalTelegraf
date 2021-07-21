@@ -1,18 +1,8 @@
+const { MainBotChats, RegisteredNotifier, UserDetailsMessage } = require("./messages");
 const messages = require("./messages");
 
 RegisterFailedHandler = async (ctx, uuid) => {
   ctx.reply(messages.RegisterFailedGeneralError(uuid))
-}
-
-MatchHandler = async (ctx) => {
-    const re = /\/m(?:atch)? (\w+)/g
-    const parsed = re.exec(ctx.message.text)
-    if(!parsed) {
-      return ctx.reply("pls enter valid code")
-    }
-    const match_id = parsed[1]
-    await ctx.model.match(ctx.from.id, match_id)
-    await ctx.reply("matched")
 }
 
 RegisterHandler = async (ctx) => {
@@ -28,43 +18,45 @@ RegisterHandler = async (ctx) => {
     }
     const id = parsed[1]
     const success = await TryRegister(ctx, id)
-    console.log("success");
-    console.log(success);
     if (!success) {
       await RegisterFailedHandler(ctx, id);
     }
 }
 
 RegisterSuccessHandler = async (ctx) => {
-    // const person = ctx.person
-    //const match = ctx.model.getPersonByUuid(person.match)
+  const model = ctx.model;
+  const senderUid = model.getUUIDByTeleId(ctx.from.id).uid;
+  const senderPerson = model.getPersonByUUID(senderUid);
 
-    // await ctx.reply(messages.RegisterSuccess(person.name, ctx.chatTarget))
-    await ctx.reply("success");
+  // await ctx.reply(messages.RegisterSuccess(person.name, ctx.chatTarget))
+  await ctx.reply("You've registered your telegram account successfully!");
+  await ctx.reply(messages.MainBotChats(senderPerson.chats), {parse_mode: 'MarkdownV2'});
 
-    //await ctx.reply(messages.ReferToBot(ctx.chatAs))
-    //if (!ctx.isAngel) {
-    //    await ctx.reply(messages.StatusHint)
-    //}
-
-    // if (match.isRegistered()) {
-    //     await ctx.model.angelBot.telegram.sendMessage(mortal.telegramId, messages.RegisteredNotifier('angel'))
-    // }
+  for (let i=1; i<=5; i++) {
+    const chat = model.people[senderPerson.uid].chats[`chat${i}`];
+    console.log(chat);
+    if (chat.active) {
+      console.log(chat);
+      const matchPerson = model.people[chat.activematchUUID];
+      console.log(matchPerson);
+      if (matchPerson.teleId) {
+        model.bots[`chat${i}`].telegram.sendMessage(matchPerson.teleId, RegisteredNotifier);
+      }
+    }
+  }
 }
 
 TryRegister = async (ctx, id) => {
   const model = ctx.model;
   const uuid = await model.getUUIDById(id);
-  console.log(uuid)
-  const person = await model.getPersonByUUID(uuid.uid)
-  console.log(person)
+  const person = await model.getPersonByUUID(uuid.uid);
   if (!person) {
     return false;
   }
-  model.register(person, ctx.from.id, ctx.from.username)
-  ctx.person = person
+  model.register(person, ctx.from.id, ctx.from.username);
+  ctx.person = person;
 
-  await RegisterSuccessHandler(ctx)
+  await RegisterSuccessHandler(ctx);
   return true;
 }
 
@@ -80,86 +72,86 @@ DeregisterHandler = async (ctx) => {
   await ctx.otherBot.telegram.sendMessage(telegramId, messages.DeregisterSuccess)
 }
 
-MessageHandler = async (ctx) => {
+GenericMessageHandler = async (ctx, messageHandler) => {
   const senderChat = ctx.model.getBotName(ctx.tg.token);
   const res = await ctx.model.getTargetAndBot(ctx.from.id, senderChat).catch(error => console.log(error));
-  if (!res) return;
-  if ("teleId" in res.target) {
-    await res.bot.telegram.sendMessage(res.target.teleId, ctx.message.text)
+  if (!res) {
+    await ctx.reply("Moot: Your message wasn't delivered, because this chat doesn't have an active match yet.");
+    return;
+  }
+  if (res.target.teleId) {
+    const errorCode = await messageHandler(res);
+    if (errorCode && errorCode === 404 || errorCode === 400) {
+      await ctx.reply("Moot: Your message wasn't delivered, because your chat partner may not have activated their bot.");
+    }
   } else {
     await ctx.reply(messages.UnregisteredTarget(ctx.chatTarget))
   }
+}
+
+MessageHandler = async (ctx) => {
+  await GenericMessageHandler(ctx, async (res) => {
+    return await res.bot.telegram.sendMessage(res.target.teleId, "User: " + ctx.message.text).catch(error => {
+      console.log(error);
+      return error.code;
+    });
+  })
 }
 
 StickerHandler = async (ctx) => {
-  const senderChat = ctx.model.getBotName(ctx.tg.token);
-  const res = await ctx.model.getTargetAndBot(ctx.from.id, senderChat).catch(error => console.log(error));
-  if (!res) return;
-  if ("teleId" in res.target) {
-    await res.bot.telegram.sendSticker(res.target.teleId, ctx.message.sticker.file_id)
-  } else {
-    await ctx.reply(messages.UnregisteredTarget(ctx.chatTarget))
-  }
+  await GenericMessageHandler(ctx, async (res) => {
+    return await res.bot.telegram.sendSticker(res.target.teleId, ctx.message.sticker.file_id).catch(error => {
+      console.log(error);
+      return error.code;
+    });
+  });
 }
 
 PhotoHandler = async (ctx) => {
-  const photos = ctx.message.photo
-  const caption = ctx.message.caption || ""
-  
-  const senderChat = ctx.model.getBotName(ctx.tg.token);
-  const res = await ctx.model.getTargetAndBot(ctx.from.id, senderChat).catch(error => console.log(error));
-  if (!res) return;
-  if ("teleId" in res.target) {
-    const fileLink = await ctx.telegram.getFileLink(photos[0].file_id)
-    await res.bot.telegram.sendPhoto(res.target.teleId, {url: fileLink}, {caption})
-  } else {
-    await ctx.reply("match hasn't registered")
-        //messages.UnregisteredTarget(ctx.chatTarget))
-  }
+  await GenericMessageHandler(ctx, async (res) => {
+    const photos = ctx.message.photo;
+    const caption = "User: " + ctx.message.caption || "";
+    const fileLink = await ctx.telegram.getFileLink(photos[0].file_id);
+    return await res.bot.telegram.sendPhoto(res.target.teleId, {url: fileLink}, {caption}).catch(error => {
+      console.log(error);
+      return error.code;
+    });
+  });  
 }
 
 VideoHandler = async (ctx) => {
-  const video = ctx.message.video
-  const caption = ctx.message.caption || ""
-
-  const senderChat = ctx.model.getBotName(ctx.tg.token);
-  const res = await ctx.model.getTargetAndBot(ctx.from.id, senderChat).catch(error => console.log(error));
-  if (!res) return;
-  if ("teleId" in res.target) {
-    const fileLink = await ctx.telegram.getFileLink(video.file_id)
-    await res.bot.telegram.sendVideo(res.target.teleId, {url: fileLink}, {caption})
-  } else {
-    await ctx.reply("match hasn't registered")
-        //messages.UnregisteredTarget(ctx.chatTarget))
-  }
+  await GenericMessageHandler(ctx, async (res) => {
+    const video = ctx.message.video;
+    const caption = "User" + ctx.message.caption || "";
+    const fileLink = await ctx.telegram.getFileLink(video.file_id);
+    return await res.bot.telegram.sendVideo(res.target.teleId, {url: fileLink}, {caption}).catch(error => {
+      console.log(error);
+      return error.code;
+    });
+  });
 }
 
 VoiceHandler = async (ctx) => {
-  const voice = ctx.message.voice
-  const senderChat = ctx.model.getBotName(ctx.tg.token);
-  const res = await ctx.model.getTargetAndBot(ctx.from.id, senderChat).catch(error => console.log(error));
-  if (!res) return;
-  if ("teleId" in res.target) {
-    const fileLink = await ctx.telegram.getFileLink(voice.file_id)
-    await res.bot.telegram.sendVoice(res.target.teleId, {url: fileLink})
-  } else {
-    await ctx.reply("match hasn't registered")
-        //messages.UnregisteredTarget(ctx.chatTarget))
-  }
+  await GenericMessageHandler(ctx, async (res) => {
+    const voice = ctx.message.voice;
+    const fileLink = await ctx.telegram.getFileLink(voice.file_id);
+    return await res.bot.telegram.sendVoice(res.target.teleId, {url: fileLink}).catch(error => {
+      console.log(error);
+      return error.code;
+    });
+  }); 
 }
 
 VideoNoteHandler = async (ctx) => {
-  const video = ctx.message.video_note
-  const senderChat = ctx.model.getBotName(ctx.tg.token);
-  const res = await ctx.model.getTargetAndBot(ctx.from.id, senderChat).catch(error => console.log(error));
-  if (!res) return;
-  if ("teleId" in res.target) {
-    const fileLink = await ctx.telegram.getFileLink(video.file_id)
-    await res.bot.telegram.sendVideoNote(res.target.teleId, {url: fileLink})
-  } else {
-    await ctx.reply("match hasn't registered")
-        //messages.UnregisteredTarget(ctx.chatTarget))
-  }
+  await GenericMessageHandler(ctx, async (res) => {
+    const video = ctx.message.video_note
+    const senderChat = ctx.model.getBotName(ctx.tg.token);
+    const fileLink = await ctx.telegram.getFileLink(video.file_id);
+    return await res.bot.telegram.sendVideoNote(res.target.teleId, {url: fileLink}).catch(error => {
+      console.log(error);
+      return error.code;
+    });
+  }); 
 }
 
 StatusHandler = async (ctx) => {
@@ -178,11 +170,17 @@ HelpHandler = async (ctx) => {
 }
 
 StartHandler = async (ctx) => {
-  const name = ctx.isRegistered ? " " + ctx.person.name : ""
-  const message = messages.BotWelcome(name, ctx.chatTarget)
+  const senderUid = ctx.model.getUUIDByTeleId(ctx.from.id);
+  const senderPerson = senderUid ? ctx.model.getPersonByUUID(senderUid.uid) : {};
+  const isRegistered = senderPerson.teleId;
+  
+  const name = isRegistered ? " " + senderPerson.username : ""
+  const message = messages.BotWelcome(name, ctx.chatTarget);
   await ctx.reply(message)
-  if (!ctx.isRegistered) {
-    await ctx.reply(messages.RegisterReminder)
+  await ctx.reply(messages.MainBotChats(senderPerson.chats), {parse_mode: 'MarkdownV2'});
+
+  if (!isRegistered) {
+    await ctx.reply(messages.RegisterReminder);
   }
 }
 
@@ -208,8 +206,8 @@ EndHandler = async (ctx) => {
     matchBOT: 0,
     status: 'vacant',
   });
-  ctx.model.bots[senderChat].telegram.sendMessage(senderPerson.teleId, 'Moot: Your conversation has ended');
-  ctx.model.bots[otherChat].telegram.sendMessage(otherPerson.teleId, 'Moot: Your conversation has ended');
+  await ctx.model.bots[senderChat].telegram.sendMessage(senderPerson.teleId, 'Moot: Your conversation has ended');
+  await ctx.model.bots[otherChat].telegram.sendMessage(otherPerson.teleId, 'Moot: Your conversation has ended');
 }
 
 EndAndFriendHandler = async (ctx) => {
@@ -243,8 +241,8 @@ EndAndFriendHandler = async (ctx) => {
       ctx.model.fb.userFriends(otherUid).push({ friendUid: senderUid, teleUser: senderPerson.teleUser , username: senderPerson.username });
       replyMessage += ' You\'ve made a new friend on moot - check out your new friend on the moot website!';
     }
-    ctx.model.bots[senderChat].telegram.sendMessage(senderPerson.teleId, replyMessage);
-    ctx.model.bots[otherChat].telegram.sendMessage(otherPerson.teleId, replyMessage);
+    await ctx.model.bots[senderChat].telegram.sendMessage(senderPerson.teleId, replyMessage);
+    await ctx.model.bots[otherChat].telegram.sendMessage(otherPerson.teleId, replyMessage);
   } else {
     ctx.model.fb.userChat(senderUid, senderChat).update({
       status: 'friend',
@@ -252,11 +250,74 @@ EndAndFriendHandler = async (ctx) => {
   }
 }
 
+ChatsHandler = async (ctx) => {
+  const senderUid = ctx.model.getUUIDByTeleId(ctx.from.id);
+  const senderPerson = senderUid ? ctx.model.getPersonByUUID(senderUid.uid) : {};
+  await ctx.reply(MainBotChats(senderPerson.chats), {parse_mode: 'MarkdownV2'});
+}
+
+MatchInfoHandler = async (ctx) => {
+  //sender
+  const senderChat = ctx.model.getBotName(ctx.tg.token);
+  const senderUid = ctx.model.getUUIDByTeleId(ctx.from.id).uid;
+  const senderPerson = ctx.model.getPersonByUUID(senderUid);
+  //match
+  const chat = senderPerson.chats[senderChat];
+  
+  if (chat.active) {
+    const matchUid = chat.activematchUUID;
+    const matchPerson = ctx.model.getPersonByUUID(matchUid);
+    const matchDescription = matchPerson.description;
+    const matchTags = Object.keys(matchPerson.tags || {});
+  
+    await ctx.reply(UserDetailsMessage(matchDescription, matchTags));  
+  } else {
+    await ctx.reply("Moot: You don't currently have an active match");  
+  }
+}
+
+QuickMatchHandler = async (ctx) => {
+  //sender
+  const senderUid = ctx.model.getUUIDByTeleId(ctx.from.id).uid;
+  const senderPerson = ctx.model.getPersonByUUID(senderUid);
+  //asserts
+  const matchAsserts = (user) => {
+    const userChats = Object.values(user.chats); 
+
+    // User must have active chat at time of match
+    if (!userChats.some(chat => !chat.active)) return { result: false, msg: "Match failed because all your chats are already filled" };
+
+    return { result: true, msg: "Success" };
+  }
+  //match
+  const timeMatched = new Date().getTime();
+
+  const asserts = matchAsserts(senderPerson);
+  if (asserts.result) {
+    ctx.model.transaction("quickMatchQueue", (queue) => {
+      if (queue) { 
+        if (!queue[senderUid]) {
+          queue[senderUid] = {
+            uid: senderUid,
+            tags: senderPerson.tags || {},
+            timeMatched: timeMatched,
+          };
+          ctx.reply(`Moot: Success! You'll be notified of a match on telegram when it's ready!`);
+        } else {
+          ctx.reply(`Moot: You already have a queued match!`);
+        }
+      }
+      return queue;
+    });
+  } else {
+    await ctx.reply("Moot:" + asserts.msg);
+  }
+}
+
 module.exports = {
   RegisterHandler,
   DeregisterHandler,
   TryRegister,
-  MatchHandler,
   EndHandler,
   EndAndFriendHandler,
   RegisterSuccessHandler,
@@ -264,10 +325,13 @@ module.exports = {
   StatusHandler,
   MessageHandler,
   HelpHandler,
+  ChatsHandler,
   StickerHandler,
   StartHandler,
   PhotoHandler,
   VideoHandler,
   VideoNoteHandler,
-  VoiceHandler
+  VoiceHandler, 
+  MatchInfoHandler,
+  QuickMatchHandler,
 }

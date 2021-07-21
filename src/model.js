@@ -1,4 +1,5 @@
 const {Firebase} = require("./firebase");
+const { MainBotNewChat, ChatBotNewChat } = require("./messages");
 
 class Model {
   constructor(store) {
@@ -10,25 +11,21 @@ class Model {
   }
 
   getPersonByName(name) {
-    const _name = name.toLowerCase()
-    const filtered = this.people.filter(person => person.name.toLowerCase() === _name)
-    return filtered.length > 0 ? filtered[0] : null
+    const _name = name.toLowerCase();
+    const filtered = this.people.filter(person => person.name.toLowerCase() === _name);
+    return filtered.length > 0 ? filtered[0] : null;
   }
 
   getPeople() {
-    return this.people
-  }
-
-  static fromJson(obj) {
-
+    return this.people;
   }
 
   toJson() {
-    return this.people.map(person => person.toJson())
+    return this.people.map(person => person.toJson());
   }
 
   dumpUuids() {
-    return this.people.map(person => `${person.name},${person.uuid}`).join("\n")
+    return this.people.map(person => `${person.name},${person.uuid}`).join("\n");
   }
 
   hasPersonWithName(name) {
@@ -58,9 +55,9 @@ class Model {
       uid: person.uid,
       teleId
     });
-    this.fb.userUUID(person.uid).update({
+    this.fb.userProfile(person.uid).update({
       teleId,
-      teleUser
+      teleUser: teleUser || "",
     })
   }
 
@@ -71,14 +68,12 @@ class Model {
   async match(teleId, matchCode) {
     const uuid_one = (await this.getUUIDByTeleId(teleId)).uid;
     const uuid_two = (await this.getUUIDById(matchCode)).uid;
-    console.log(uuid_one);
-    console.log(uuid_two)
     this.fb.userUUID(uuid_one).update({
         matchUUID: uuid_two,
     });
     this.fb.userUUID(uuid_two).update({
         matchUUID: uuid_one,
-    })
+    });
   }
 
   // chat: chat1, chat2, etc
@@ -107,28 +102,10 @@ class Model {
 
   getUUIDByTeleId(teleId) {
     return this.teleIds[teleId];
-    // return this.fb.userTeleId(teleId).once('value').then((snapshot) => {
-    //   if (snapshot.exists()) {
-    //     return snapshot.val();
-    //   } else {
-    //     console.log("No data available");
-    //   }
-    // }).catch((error) => {
-    //   console.error(error);
-    // });
   }
 
   getPersonByUUID(uuid) {
     return this.people[uuid];
-    // this.fb.userUUID(uuid).once('value').then((snapshot) => {
-    //   if (snapshot.exists()) {
-    //     return snapshot.val();
-    //   } else {
-    //     console.log("No data available");
-    //   }
-    // }).catch((error) => {
-    //   console.error(error);
-    // });
   }
 
   async getUUIDById(id) {
@@ -171,23 +148,25 @@ class Model {
     model.loadAndListen(model.fb.users(),
     (users) => {
       Object.values(users).forEach(user => {
-        model.people[user.uid] = Person.fromJson(user);
-        console.log(model.people[user.uid].chats['chat1']);
+        if (user.profile) {
+          model.people[user.profile.uid] = Person.fromJson(user);
+        }
       });
     },
     (user) => {
       const person = Person.fromJson(user);
-      if (model.people[user.uid]) {
+      const userProfile = user.profile;
+      if (model.people[userProfile.uid]) {
         var queueUpdatePending = false;
         var prevAllActive = true
         for (let i=1; i<=5; i++) {
-          const oldChat = model.people[user.uid].chats[`chat${i}`];
+          const oldChat = model.people[userProfile.uid].chats[`chat${i}`];
           const newC = user.chats[`chat${i}`];
           if (!oldChat.active) {
             prevAllActive = false;
             if (newC.active) {
-              model.bots['main'].telegram.sendMessage(user.teleId, `You have a new match on @moot_chat${i}_bot. Go say hi!`);
-              model.bots[`chat${i}`].telegram.sendMessage(user.teleId, 'Moot: You\'ve been matched with a new user! Use the /end command to end the conversation immediately or /friend to add them as a friend. If you both add friend, we\'ll add them as your friend on moot!');
+              model.bots['main'].telegram.sendMessage(userProfile.teleId, MainBotNewChat(i));
+              model.bots[`chat${i}`].telegram.sendMessage(userProfile.teleId, ChatBotNewChat);
             }
           }
         }
@@ -206,9 +185,9 @@ class Model {
               for (const key of Object.keys(queue)) {
                 if (key !== 0) {
                   const match = queue[key];
-                  if (match.likerUid === user.uid) {
+                  if (match.likerUid === user.profile.uid) {
                     queue[key].likerAvail = true;
-                  } else if (match.posterUid === user.uid) {
+                  } else if (match.posterUid === user.profile.uid) {
                     queue[key].posterAvail = true;
                   }
                 }
@@ -219,35 +198,27 @@ class Model {
           });
         }
       }
-      model.people[user.uid] = Person.fromJson(user);
+      model.people[user.profile.uid] = Person.fromJson(user);
     });
     // teleIds
     model.loadAndListen(model.fb.teleIds(),
     (teles) => {
-      console.log("here")
-      Object.values(teles).forEach(tele => {
-        model.teleIds[tele.teleId] = tele;
-        console.log(model.teleIds[tele.id]);
-      });
+      if (teles) {
+        Object.values(teles).forEach(tele => {
+          model.teleIds[tele.teleId] = tele;
+        });
+      }
     },
     (tele) => {
-      console.log(tele);
       model.teleIds[tele.teleId] = tele;
     });
 
     return model;
   }
 
-  // copyPeopleFrom(other) {
-  //     for (const newPerson of other.people) {
-  //         if (this.hasPersonWithName(newPerson.name)) {
-  //             console.warn("Error: there is already a person " + name + " in the database.");
-  //             continue;
-  //         }
-  //         newPerson.uuid = this.generateNewUuid();
-  //         this.addPerson(newPerson);
-  //     }
-  // }
+  transaction(ref, fn) {
+    this.fb.db.ref(ref).transaction(fn);
+  }
 }
 
 class Person {
@@ -263,49 +234,19 @@ class Person {
     return this;
   }
 
-  // withName(name) {
-  //     this.name = name;
-  //     return this;
-  // }
-
-  // register(telegramId) {
-  //     this.telegramId = telegramId;
-  // }
-
-  // deregister() {
-  //     this.telegramId = ""
-  // }
-
-  // isRegistered() {
-  //     return this.telegramId !== ""
-  // }
-
-  // toJson() {
-  //     return {
-  //         uuid: this.uuid,
-  //         name: this.name,
-  //         username: this.username,
-  //         telegramId: this.telegramId,
-  //         match: this.match || null,
-  //     }
-  // }
-
   static fromJson(obj) {
     const person = new Person();
-    person.uid = obj.uid;
-    person.id = obj.id;
-    person.username = obj.username;
-    person.teleId = obj.teleId;
-    person.teleUser = obj.teleUser;
-    person.email = obj.email;
+    const profile = obj.profile || {};
+
+    person.uid = profile.uid;
+    person.id = profile.id;
+    person.description = profile.description;
+    person.username = profile.username;
+    person.teleId = profile.teleId;
+    person.teleUser = profile.teleUser;
+    person.email = profile.email;
+    person.tags = obj.tags || {};
     person.chats = obj.chats;
-    // {
-    //   'chat1': obj.chat1,
-    //   'chat2': obj.chat2,
-    //   'chat3': obj.chat3,
-    //   'chat4': obj.chat4,
-    //   'chat5': obj.chat1,
-    // }
     return person
   }
 }
