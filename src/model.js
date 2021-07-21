@@ -215,6 +215,10 @@ class Model {
 
     return model;
   }
+
+  transaction(ref, fn) {
+    this.fb.db.ref(ref).transaction(fn);
+  }
 }
 
 class Person {
@@ -241,6 +245,7 @@ class Person {
     person.teleId = profile.teleId;
     person.teleUser = profile.teleUser;
     person.email = profile.email;
+    person.tags = obj.tags || {};
     person.chats = obj.chats;
     return person
   }

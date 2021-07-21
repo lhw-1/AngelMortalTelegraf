@@ -50,12 +50,13 @@ async function start(model) {
         bot.start(Commands.StartHandler);
         bot.help(Commands.StartHandler);
         bot.command(['register', 'r'], Commands.RegisterHandler);
-        bot.command(['match', 'm'], Commands.MatchHandler);
         // bot.use(Middleware.RequireRegister);
         bot.command(['deregister', 'd'], Commands.DeregisterHandler);
         if (bot._name != "mootBot"){
           bot.command(['end'], Commands.EndHandler);
           bot.command(['friend'], Commands.EndAndFriendHandler);
+          bot.command(['matchinfo'], Commands.MatchInfoHandler);
+          bot.command(['quickmatch'], Commands.QuickMatchHandler);
           bot.on('sticker', Commands.StickerHandler);
           bot.on('photo', Commands.PhotoHandler);
           bot.on('video', Commands.VideoHandler);
