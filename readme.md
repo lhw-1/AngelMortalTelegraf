@@ -3,7 +3,7 @@ This bot allows users to message the bot as if they were messaging the other per
 # for admins
 Each participant is given a `name` (need not be related to real name nor telegram id), and automatically generated `uuid`. Details such as telegram ID will be automatically captured. angel/mortal pairings are captured when registering. Each person can have up to one angel and up to one mortal.
 ## Set up
-Create two telegram bots through botfather
+Create two telegram bots through botfather.
 Put the prefix and bot tokens into a `.env` file in the root directory with the format:
 ```
 PREFIX=mmvp
