@@ -35,5 +35,6 @@ module.exports = {
     MainBotNewChat: (i) => `Moot: You have a new match on @moot_chat${i}_bot. Go say hi!`,
     MainBotChats: (chats) => botChatText(chats),
     ChatBotNewChat: "Moot: You\'ve been matched with a new user!\n\nUse the /end command to end the conversation immediately or /friend to add them as a friend. If you both add friend, we\'ll add them as your friend on moot!\n\nYou can also use the command /matchinfo to find out more about this match!",
-    UserDetailsMessage: (description, tags) => `Moot: This chat is anonymous, but here's what we can tell you about your match:\n\nDescription:\n${description}\n\nInterests:\n${tags.length <= 0 ? "No declared interests" : tags.slice(1).reduce((acc, curr) => `${acc}, ${curr}`,tags[0])}`
-};
+    UserDetailsMessage: (description, tags) => `Moot: This chat is anonymous, but here's what we can tell you about your match:\n\nDescription:\n${description}\n\nInterests:\n${tags.length <= 0 ? "No declared interests" : tags.slice(1).reduce((acc, curr) => `${acc}, ${curr}`,tags[0])}`,
+    NoActiveConversation: "Moot: You don't currently have an active match",
+  };

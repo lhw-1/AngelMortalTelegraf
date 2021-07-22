@@ -189,6 +189,12 @@ EndHandler = async (ctx) => {
   const senderChat = ctx.model.getBotName(ctx.tg.token);
   const senderUid = ctx.model.getUUIDByTeleId(ctx.from.id).uid;
   const senderPerson = ctx.model.getPersonByUUID(senderUid);
+  
+  if (!senderPerson.chats[senderChat].active) {
+    await ctx.reply(messages.NoActiveConversation);
+    return;
+  }
+
   // other
   const otherChat = 'chat' + senderPerson.chats[senderChat].matchBOT;
   const otherUid = senderPerson.chats[senderChat].activematchUUID;
@@ -215,6 +221,12 @@ EndAndFriendHandler = async (ctx) => {
   const senderChat = ctx.model.getBotName(ctx.tg.token);
   const senderUid = ctx.model.getUUIDByTeleId(ctx.from.id).uid;
   const senderPerson = ctx.model.getPersonByUUID(senderUid);
+
+  if (!senderPerson.chats[senderChat].active) {
+    await ctx.reply(messages.NoActiveConversation);
+    return;
+  }
+
   // other
   const otherChat = 'chat' + senderPerson.chats[senderChat].matchBOT;
   const otherUid = senderPerson.chats[senderChat].activematchUUID;
@@ -272,7 +284,7 @@ MatchInfoHandler = async (ctx) => {
   
     await ctx.reply(UserDetailsMessage(matchDescription, matchTags));  
   } else {
-    await ctx.reply("Moot: You don't currently have an active match");  
+    await ctx.reply(messages.NoActiveConversation);  
   }
 }
 
