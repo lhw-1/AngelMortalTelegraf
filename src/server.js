@@ -46,7 +46,7 @@ async function start(model) {
 
     const bots = [mootBot, chat1Bot, chat2Bot, chat3Bot, chat4Bot, chat5Bot];
     bots.forEach(bot => {
-        bot.use(Middleware.WithModel(model), Middleware.ErrorHandler, Middleware.CodeFilter);
+        bot.use(Middleware.WithModel(model), Middleware.ErrorHandler, Middleware.CodeFilter, Middleware.UpdateTeleUser);
         bot.start(Commands.StartHandler);
         bot.help(Commands.StartHandler);
         bot.command(['register', 'r'], Commands.RegisterHandler);

@@ -61,6 +61,18 @@ class Model {
     })
   }
 
+  async updateTeleUser(userUid, teleUser) {
+    if (userUid && teleUser) {
+      const person = this.getPersonByUUID(userUid);
+      if (person.teleUser !== teleUser) {
+        console.log(`TeleUser changed from ${person.teleUser} to ${teleUser}`);
+        await this.fb.userProfile(userUid).update({
+          teleUser: teleUser || "",
+        });
+      }
+    }
+  }
+
   getBotName(apiKey) {
     return this.botIds[this.botIds.findIndex(elem => elem.key === apiKey)].value;
   }

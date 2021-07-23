@@ -15,6 +15,13 @@ CodeFilter = Telegraf.hears(/^\d{9}$/m, async (ctx) => {
     }
 })
 
+UpdateTeleUser = async (ctx, next) => {
+  const senderUid = (ctx.model.getUUIDByTeleId(ctx.from.id) || {}).uid;
+  const senderTeleUser = ctx.from.username;
+  await ctx.model.updateTeleUser(senderUid, senderTeleUser);
+  await next();
+}
+
 WithModel = (model) => async (ctx, next) => {
     ctx.model = model
     await next()
@@ -86,4 +93,4 @@ Settings = (bots) => async(ctx, next) => {
     await next()
 }
 
-module.exports = {UserId, OnlyPrivate, ErrorHandler, WithModel, Settings, CodeFilter}
+module.exports = {UserId, OnlyPrivate, ErrorHandler, WithModel, Settings, CodeFilter, UpdateTeleUser}

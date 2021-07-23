@@ -249,8 +249,8 @@ EndAndFriendHandler = async (ctx) => {
       status: 'vacant',
     });
     if (otherStatus === 'friend') {
-      ctx.model.fb.userFriends(senderUid).push({ friendUid: otherUid, teleUser: otherPerson.teleUser , username: otherPerson.username });
-      ctx.model.fb.userFriends(otherUid).push({ friendUid: senderUid, teleUser: senderPerson.teleUser , username: senderPerson.username });
+      ctx.model.fb.userFriends(senderUid).push({ uid: otherUid });
+      ctx.model.fb.userFriends(otherUid).push({ uid: senderUid });
       replyMessage += ' You\'ve made a new friend on moot - check out your new friend on the moot website!';
     }
     await ctx.model.bots[senderChat].telegram.sendMessage(senderPerson.teleId, replyMessage);
