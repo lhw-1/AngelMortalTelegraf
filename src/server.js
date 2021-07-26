@@ -4,6 +4,11 @@ const Middleware = require("./middleware");
 const {Telegraf} = require('telegraf');
 require('dotenv').config();
 
+/**
+ * initialize bots
+ * 
+ * @param {Model} model 
+ */
 async function start(model) {
     const apiMain = process.env.BOT_TOKEN;
     const api1 = process.env.CHATBOT1_TOKEN;
@@ -53,10 +58,12 @@ async function start(model) {
         // bot.use(Middleware.RequireRegister);
         bot.command(['deregister', 'd'], Commands.DeregisterHandler);
         if (bot._name != "mootBot"){
+          // Chat bot specific handlers
           bot.command(['end'], Commands.EndHandler);
           bot.command(['friend'], Commands.EndAndFriendHandler);
           bot.command(['matchinfo'], Commands.MatchInfoHandler);
           bot.command(['quickmatch'], Commands.QuickMatchHandler);
+          bot.command(['test'], Commands.TestHandler);
           bot.on('sticker', Commands.StickerHandler);
           bot.on('photo', Commands.PhotoHandler);
           bot.on('video', Commands.VideoHandler);
@@ -65,6 +72,7 @@ async function start(model) {
           bot.on('message', Commands.MessageHandler);
           //TODO: handle sending files
         } else {
+          // Main bot specific handlers
           bot.command(['chats'], Commands.ChatsHandler);
         }
         bot.launch().then(() => console.log(bot._name + " started")).catch(console.error);

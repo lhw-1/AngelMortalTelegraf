@@ -1,6 +1,12 @@
 const {Firebase} = require("./firebase");
 const { MainBotNewChat, ChatBotNewChat } = require("./messages");
 
+/**
+ * Cache of relevant firebase data
+ * 
+ * Handles synchronisation with firebase, and provides
+ * API for commands
+ */
 class Model {
   constructor(store) {
     this.fb = new Firebase();
@@ -10,35 +16,33 @@ class Model {
     this.botIds = [];
   }
 
-  getPersonByName(name) {
-    const _name = name.toLowerCase();
-    const filtered = this.people.filter(person => person.name.toLowerCase() === _name);
-    return filtered.length > 0 ? filtered[0] : null;
-  }
-
+  /**
+   * getter for model people
+   * 
+   * @returns cached user data
+   */
   getPeople() {
     return this.people;
   }
 
+  /**
+   * converts people array to array of json string
+   * 
+   * @returns array of strings
+   */
   toJson() {
     return this.people.map(person => person.toJson());
   }
 
-  dumpUuids() {
-    return this.people.map(person => `${person.name},${person.uuid}`).join("\n");
-  }
 
-  hasPersonWithName(name) {
-    for (const person of this.people) {
-      if (name === person.name) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-
-  // types = 'value', 'child_changed'
+  /**
+   * set up a firebase listener
+   * 
+   * @param {Function} handle handler for listened data
+   * @param {string} ref firebase data ref
+   * @param {string} type can be 'value' or 'child_changed'
+   * @returns model itself
+   */
   setupListener(handle, ref, type) {
     ref.on(type, (snapshot) => {
       const data = snapshot.val();
@@ -49,6 +53,13 @@ class Model {
     return this;
   }
 
+  /**
+   * register a user
+   * 
+   * @param {Person} person 
+   * @param {string} teleId 
+   * @param {string} teleUser 
+   */
   register(person, teleId, teleUser) {
     this.fb.userTeleId(teleId).set({
       id: person.id,
@@ -61,6 +72,12 @@ class Model {
     })
   }
 
+  /**
+   * update user's tele handle
+   * 
+   * @param {string} userUid 
+   * @param {string} teleUser 
+   */
   async updateTeleUser(userUid, teleUser) {
     if (userUid && teleUser) {
       const person = this.getPersonByUUID(userUid);
@@ -73,22 +90,24 @@ class Model {
     }
   }
 
+  /**
+   * get name of the bot from telegram API key 
+   * 
+   * @param {string} apiKey 
+   * @returns bot name string
+   */
   getBotName(apiKey) {
     return this.botIds[this.botIds.findIndex(elem => elem.key === apiKey)].value;
   }
 
-  async match(teleId, matchCode) {
-    const uuid_one = (await this.getUUIDByTeleId(teleId)).uid;
-    const uuid_two = (await this.getUUIDById(matchCode)).uid;
-    this.fb.userUUID(uuid_one).update({
-        matchUUID: uuid_two,
-    });
-    this.fb.userUUID(uuid_two).update({
-        matchUUID: uuid_one,
-    });
-  }
-
-  // chat: chat1, chat2, etc
+  /**
+   * get the match user and bot corresponding to a
+   * given user and chat name
+   * 
+   * @param {string} fromId sender user id
+   * @param {string} chat chat name of sender user
+   * @returns promise of target user and match bot
+   */
   getTargetAndBot(fromId, chat) {
     return new Promise((resolve, reject) => {
       const senderTele = this.teleIds[fromId];
@@ -112,14 +131,32 @@ class Model {
     });
   }
 
+  /**
+   * Get user uid corresponding to teleId
+   * 
+   * @param {string} teleId 
+   * @returns user uid
+   */
   getUUIDByTeleId(teleId) {
     return this.teleIds[teleId];
   }
 
+  /**
+   * get person corresponding to user uid
+   * 
+   * @param {string} uuid 
+   * @returns person
+   */
   getPersonByUUID(uuid) {
     return this.people[uuid];
   }
 
+  /**
+   * get user uid from moot generated id
+   * 
+   * @param {string} id 
+   * @returns uuid
+   */
   async getUUIDById(id) {
     return this.fb.userID(id).once('value').then((snapshot) => {
       if (snapshot.exists()) {
@@ -132,6 +169,12 @@ class Model {
     });
   }
 
+  /**
+   * get person corresponding to tele handle
+   * 
+   * @param {string} handle telegram handle
+   * @returns person
+   */
   getPersonByHandle(handle) {
     return this.fb.userHandle(handle).once('value').then((snapshot) => {
       if (snapshot.exists()) {
@@ -144,6 +187,14 @@ class Model {
     }); 
   }
 
+  /**
+   * load up firebase data, and listen to 
+   * ref data for updates
+   * 
+   * @param {string} ref data ref
+   * @param {Function} handleLoad handle initial load
+   * @param {Function} handleListen handle updates
+   */
   loadAndListen(ref, handleLoad, handleListen) {
     ref.once('value').then((snapshot) => {
       handleLoad(snapshot.val());
@@ -154,6 +205,11 @@ class Model {
     this.setupListener(handleListen, ref, "child_added");
   }
 
+  /**
+   * initialise and return model
+   * 
+   * @returns model
+   */
   static createModel() {  
     const model = new Model();
     // users  
@@ -228,11 +284,21 @@ class Model {
     return model;
   }
 
+  /**
+   * abstraction of firebase transaction
+   * 
+   * @param {string} ref ref for data
+   * @param {string} fn function that takes in 
+   * the value before operation and returns the value after
+   */
   transaction(ref, fn) {
     this.fb.db.ref(ref).transaction(fn);
   }
 }
 
+/**
+ * Person as abstraction over firebase user
+ */
 class Person {
   constructor() {
     this.uid = "";
@@ -246,6 +312,13 @@ class Person {
     return this;
   }
 
+
+  /**
+   * create person from firebase user object
+   *  
+   * @param {json} obj firebase user
+   * @returns person
+   */
   static fromJson(obj) {
     const person = new Person();
     const profile = obj.profile || {};

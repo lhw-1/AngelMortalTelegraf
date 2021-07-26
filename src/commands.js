@@ -72,20 +72,28 @@ DeregisterHandler = async (ctx) => {
   await ctx.otherBot.telegram.sendMessage(telegramId, messages.DeregisterSuccess)
 }
 
-GenericMessageHandler = async (ctx, messageHandler) => {
-  const senderChat = ctx.model.getBotName(ctx.tg.token);
-  const res = await ctx.model.getTargetAndBot(ctx.from.id, senderChat).catch(error => console.log(error));
-  if (!res) {
-    await ctx.reply("Moot: Your message wasn't delivered, because this chat doesn't have an active match yet.");
-    return;
-  }
-  if (res.target.teleId) {
-    const errorCode = await messageHandler(res);
-    if (errorCode && errorCode === 404 || errorCode === 400) {
-      await ctx.reply("Moot: Your message wasn't delivered, because your chat partner may not have activated their bot.");
+GenericMessageHandler = async (ctx, messageHandler, testHandler) => {
+  const senderUid = ctx.model.getUUIDByTeleId(ctx.from.id).uid;
+  const senderPerson = ctx.model.getPersonByUUID(senderUid);
+  if (!senderPerson.testMode) {
+    const senderChat = ctx.model.getBotName(ctx.tg.token);
+    const res = await ctx.model.getTargetAndBot(ctx.from.id, senderChat).catch(error => console.log(error));
+    if (!res) {
+      await ctx.reply("Moot: Your message wasn't delivered, because this chat doesn't have an active match yet.");
+      return;
+    }
+    if (res.target.teleId) {
+      const errorCode = await messageHandler(res);
+      if (errorCode && errorCode === 404 || errorCode === 400) {
+        await ctx.reply("Moot: Your message wasn't delivered, because your chat partner may not have activated their bot.");
+      }
+    } else {
+      await ctx.reply(messages.UnregisteredTarget(ctx.chatTarget))
     }
   } else {
-    await ctx.reply(messages.UnregisteredTarget(ctx.chatTarget))
+    const senderChat = ctx.model.getBotName(ctx.tg.token);
+    const res = await ctx.model.getTargetAndBot(ctx.from.id, senderChat).catch(error => { console.log(errror); return null; });
+    testHandler(senderPerson, res);
   }
 }
 
@@ -95,6 +103,16 @@ MessageHandler = async (ctx) => {
       console.log(error);
       return error.code;
     });
+  }, async (person, res) => {
+    if (person.testState !== 1) return;
+    if (res === null) {
+      person.testMode = false;
+      person.testState = -1;
+      ctx.reply("Test failed, reverting test mode");
+    } else {
+      person.testState = 2;
+      ctx.reply("Test passed, send a sticker");
+    }
   })
 }
 
@@ -104,6 +122,16 @@ StickerHandler = async (ctx) => {
       console.log(error);
       return error.code;
     });
+  }, async (person, res) => {
+    if (person.testState !== 2) return;
+    if (res === null) {
+      person.testMode = false;
+      person.testState = -1;
+      ctx.reply("Test failed, reverting test mode");
+    } else {
+      person.testState = 3;
+      ctx.reply("Test passed, send a photo");
+    }
   });
 }
 
@@ -116,6 +144,25 @@ PhotoHandler = async (ctx) => {
       console.log(error);
       return error.code;
     });
+  }, async (person, res) => {
+    if (person.testState !== 3) return;
+    if (res === null) {
+      person.testMode = false;
+      person.testState = -1;
+      ctx.reply("Test failed, reverting test mode");
+    } else {
+      try {
+        const photos = ctx.message.photo;
+        const caption = "User: " + ctx.message.caption || "";
+        const fileLink = await ctx.telegram.getFileLink(photos[0].file_id);
+        person.testState = 4;
+        ctx.reply("Test passed, send a video");  
+      } catch (e) {
+        person.testMode = false;
+        person.testState = -1;
+        ctx.reply("Test failed, reverting test mode");  
+      }
+    }
   });  
 }
 
@@ -128,6 +175,25 @@ VideoHandler = async (ctx) => {
       console.log(error);
       return error.code;
     });
+  }, async (person, res) => {
+    if (person.testState !== 4) return;
+    if (res === null) {
+      person.testMode = false;
+      person.testState = -1;
+      ctx.reply("Test failed, reverting test mode");
+    } else {
+      try {
+        const video = ctx.message.video;
+        const caption = "User" + ctx.message.caption || "";
+        const fileLink = await ctx.telegram.getFileLink(video.file_id);
+        person.testState = 5;
+        ctx.reply("Test passed, send a voice recording");  
+      } catch (e) {
+        person.testMode = false;
+        person.testState = -1;
+        ctx.reply("Test failed, reverting test mode");  
+      }
+    }
   });
 }
 
@@ -139,6 +205,27 @@ VoiceHandler = async (ctx) => {
       console.log(error);
       return error.code;
     });
+  }, async (person, res) => {
+    if (person.testState !== 5) return;
+    if (res === null) {
+      console.log("here1");
+      person.testMode = false;
+      person.testState = -1;
+      ctx.reply("Test failed, reverting test mode");
+    } else {
+      try {
+        const voice = ctx.message.voice;
+        const fileLink = await ctx.telegram.getFileLink(voice.file_id);
+        person.testState = -1;
+        person.testMode = false;
+        ctx.reply("All test cases passed, reverting test mode");  
+      } catch (e) {
+        console.log(e);
+        person.testMode = false;
+        person.testState = -1;
+        ctx.reply("Test failed, reverting test mode");  
+      }
+    }
   }); 
 }
 
@@ -326,6 +413,14 @@ QuickMatchHandler = async (ctx) => {
   }
 }
 
+TestHandler = async (ctx) => {
+  const senderUid = ctx.model.getUUIDByTeleId(ctx.from.id).uid;
+  const senderPerson = ctx.model.getPersonByUUID(senderUid);
+  senderPerson.testMode = true;
+  senderPerson.testState = 1;
+  await ctx.reply("Test Mode started, type any message");
+}
+
 module.exports = {
   RegisterHandler,
   DeregisterHandler,
@@ -346,4 +441,5 @@ module.exports = {
   VoiceHandler, 
   MatchInfoHandler,
   QuickMatchHandler,
+  TestHandler,
 }
