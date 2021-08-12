@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://lh3.googleusercontent.com/keep-bbsk/AGk0z-MsssfEwTPHJ-o1m-EWVFqpM-QGrWSZh2cMyVvtG-XIG7TYjoIxr1AIU1GmSYZBDoOfdhjsDpz2SPbvG5n1qsJSsC4x1xqPYumStjs=s445" />
+  <img src="https://user-images.githubusercontent.com/34594184/129216802-14dd2e61-2db8-4933-abc3-06fd0e139b82.png" />
 </p>
 
 # Moot Telegram
